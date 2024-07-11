@@ -33,14 +33,22 @@ class Events extends GroupMacro
 	public function description()
 	{
 		$txt = array();
-		$txt['html']  = '<p>Displays group events. All dates are in YYYY-MM-DD format.</p>';
+		$txt['html']  = '<p>Displays group events.</p>';
+		$txt['html'] .= '<p>Arguments:</p>
+							<ul>
+								<li><code>from</code> - The start date of the events to display. Default is "today". Can be either in YYYY-MM-DD format, or one of "today", "yesterday", or "tomorrow.</li>
+								<li><code>to</code> - The end date of the events to display. Default is one year after "from" date. Can be either in YYYY-MM-DD format, or one of "today", "yesterday", or "tomorrow.</li>
+								<li><code>for</code> - The duration of events to display, starting after "from" date (inclusive). Default is "1 year". Can use number of days, weeks, months, or years. This argument is ignored if the "to" argument is specified.</li>
+							</ul>';
 		$txt['html'] .= '<p>Examples:</p>
 							<ul>
-								<li><code>[[Group.Events()]]</code> - Displays all future events</li>
-								<li><code>[[Group.Events(from=2021-04-15)]]</code> - Displays events from 2021-04-15</li>
-								<li><code>[[Group.Events(from=2021-04-15, for=3 months)]]</code> - Displays 3 months of events from 2021-04-15 (can use days, weeks, months, years)</li>
-								<li><code>[[Group.Events(from=today, to=2025-01-01)]]</code> - Displays events from today to 2025-01-01</li>
-								<li><code>[[Group.Events(to=today)]]</code> - Displays events up to today (not inclusive)</li>
+								<li><code>[[Group.Events()]]</code> - Displays all events from today to 1 year from today</li>
+								<li><code>[[Group.Events(from=today)]]</code> - Another way to display all events from today to 1 year from today</li>
+								<li><code>[[Group.Events(from=today, for=3 months)]]</code> - Displays 3 months of events from today</li>
+								<li><code>[[Group.Events(from=today, to=today)]]</code> - Displays events for today only</li>
+								<li><code>[[Group.Events(from=0000-01-01, to=yesterday)]]</code> - Displays events up to and including yesterday (i.e. all past events)</li>
+								<li><code>[[Group.Events(from=2021-04-15)]]</code> - Displays events from 2021-04-15 to 2022-04-14 (1 year default)</li>
+								<li><code>[[Group.Events(from=2021-04-15, to=2025-01-01)]]</code> - Displays events from 2021-04-15 to 2025-01-01</li>
 							</ul>';
 
 		return $txt['html'];
@@ -64,7 +72,25 @@ class Events extends GroupMacro
 
 		// Array of filters
 		$filters = array();
-		echo var_dump($args);
+		
+		// Get arguments
+		if (($filters['from'] = $this->_getFrom($args)) === false) {
+			return "<p style='color:red;'>Error in Group.Events macro: Invalid 'from' argument. Please use either one of 'today', 'tomorrow', or 'yesterday', or a proper date of the form YYYY-MM-DD.</p>";
+		}
+		if (($filters['to'] = $this->_getTo($args)) === false) {
+			return "<p style='color:red;'>Error in Group.Events macro: Invalid 'to' argument. Please use either one of 'today', 'tomorrow', or 'yesterday', or a proper date of the form YYYY-MM-DD.</p>";
+		}
+		if (!$filters['to']) { // Only get 'for' if 'to' is not specified
+			if (($filters['for'] = $this->_getFor($args)) === false) {
+				return "<p style='color:red;'>Error in Group.Events macro: Invalid 'for' argument. Please use a number, whitespace, and then 'days', 'weeks', 'months', or 'years'.</p>";
+			}
+			$filters['to'] = Date::of($filters['from'])->add($filters['for'])->format('Y-m-d 23:59:59');
+		}
+
+		// From date should be before to date
+		if ($filters['from'] && $filters['to'] && strtotime($filters['from']) > strtotime($filters['to'])) {
+			return "<p style='color:red;'>Error in Group.Events macro: 'from' date must be before 'to' date.</p>";
+		}
 
 		// Get group events
 		$events =  $this->getGroupEvents($this->group, $filters);
@@ -96,24 +122,10 @@ class Events extends GroupMacro
 		// array to hold events
 		$events = array();
 
-		// get request params
-		$start      = isset($filters['start']) ? $filters['start'] : '';
-		$end        = isset($filters['end']) ? $filters['end'] : '';
+		// get request params ($from and $to should already exist)
+		$start = $filters['from'];
+		$end = $filters['to'];
 		$calendarId = isset($filters['calendar_id']) ? $filters['calendar_id'] : 0;
-
-		if ($start && !preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $start))
-		{
-			$start = '';
-		}
-		if ($end && !preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $end))
-		{
-			$end = '';
-		}
-
-		// format date/times
-		$start = $start . ' 00:00:00';
-		$end   = '0000-00-00 00:00:00';
-		$until = Date::of('now')->add('1 year')->format('Y-m-d H:i:s');
 
 		// get calendar events
 		$eventsCalendar = \Components\Events\Models\Calendar::getInstance();
@@ -135,7 +147,7 @@ class Events extends GroupMacro
 			'state'        => array(1),
 			'publish_up'   => $start, // $start->format('Y-m-d H:i:s'),
 			'publish_down' => $end, // $end->format('Y-m-d H:i:s')
-			'until'		   => $until // $end->format('Y-m-d H:i:s')
+			'until'		   => $end // $end->format('Y-m-d H:i:s')
 		));
 
 		// merge events with repeating events
@@ -300,5 +312,106 @@ class Events extends GroupMacro
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Get for argument
+	 *
+	 * @param   array  $args  Macro Arguments
+	 * @return  mixed
+	 */
+	private function _getFor(&$args)
+	{
+		foreach ($args as $k => $arg)
+		{
+			// Match any word characters, digits, or spaces
+			if (preg_match('/for[\s]*=[\s]*([\w\d\s]*)/', $arg, $matches))
+			{
+				$for = (isset($matches[1])) ? $matches[1] : '';
+				unset($args[$k]);
+
+				// Validation - Check if from is a number, space, then word
+				if (!preg_match('/([\d]*)\s([\w]*)/', $for, $matches) ||
+				    !in_array($matches[2], array('day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years'))) {
+					$for = false; // Invalid
+				}
+
+				return $for;
+			}
+		}
+
+		// Default to 1 year
+		$for = "1 year";
+		return $for;
+	}
+
+	/**
+	 * Get from argument
+	 *
+	 * @param   array  $args  Macro Arguments
+	 * @return  mixed
+	 */
+	private function _getFrom(&$args)
+	{
+		foreach ($args as $k => $arg)
+		{
+			// Match any word characters, digits, or spaces
+			if (preg_match('/from[\s]*=[\s]*([\w\d-]*)/', $arg, $matches))
+			{
+				$from = (isset($matches[1])) ? $matches[1] : '';
+				unset($args[$k]);
+
+				// Validation - Check if from is a number, space, then word, or the word "today"
+				if (!(preg_match('/([\d]{4}[-\/][\d]{2}[-\/][\d]{2})/', $from, $matches) && (strtotime($matches[1]) !== false)) &&
+					!in_array($from, array("today", "yesterday", "tomorrow"))) {
+					$from = false; // Invalid
+				} elseif ($from == "today") {
+					$from = Date::of('now')->format('Y-m-d 00:00:00');
+				} elseif ($from == "yesterday") {
+					$from = Date::of('yesterday')->format('Y-m-d 00:00:00');
+				} elseif ($from == "tomorrow") {
+					$from = Date::of('tomorrow')->format('Y-m-d 00:00:00');
+				}
+
+				return $from;
+			}
+		}
+
+		// Default to today
+		$from = Date::of('now')->format('Y-m-d 00:00:00');
+		return $from;
+	}
+
+	/**
+	 * Get to argument
+	 *
+	 * @param   array  $args  Macro Arguments
+	 * @return  mixed
+	 */
+	private function _getTo(&$args)
+	{
+		foreach ($args as $k => $arg)
+		{
+			// Match any word characters, digits, or spaces
+			if (preg_match('/to[\s]*=[\s]*([\w\d-]*)/', $arg, $matches))
+			{
+				$to = (isset($matches[1])) ? $matches[1] : '';
+				unset($args[$k]);
+
+				// Validation - Check if from is a number, space, then word, or the word "today"
+				if (!(preg_match('/([\d]{4}[-\/][\d]{2}[-\/][\d]{2})/', $to, $matches) && (strtotime($matches[1]) !== false)) &&
+				    !in_array($to, array("today", "yesterday", "tomorrow"))) {
+					$to = false; // Invalid
+				} elseif ($to == "today") {
+					$to = Date::of('now')->format('Y-m-d 23:59:59');
+				} elseif ($to == "yesterday") {
+					$to = Date::of('yesterday')->format('Y-m-d 23:59:59');
+				} elseif ($to == "tomorrow") {
+					$to = Date::of('tomorrow')->format('Y-m-d 23:59:59');
+				}
+
+				return $to;
+			}
+		}
 	}
 }
