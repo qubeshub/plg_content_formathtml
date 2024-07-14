@@ -210,11 +210,8 @@ class Events extends GroupMacro
 					}
 				}
 			} else {
-				// Adjustment for same-day all-day event
-				if (Date::of($down)->subtract('24 hours') <= $up)
-				{
-					$down = $up->add('24 hours');
-				}
+				// Adjustment since hub stores down of all-day events as next day at midnight
+				$down = $down->subtract('24 hours');
 
 				// Is this an open-ended event?
 				if ($down <= Date::of('0000-00-00 00:00:00') || 
