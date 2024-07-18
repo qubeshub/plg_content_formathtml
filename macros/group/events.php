@@ -39,6 +39,7 @@ class Events extends GroupMacro
 								<li><code>from</code> - The start date of the events to display. Default is "today". Can be either in YYYY-MM-DD format, or one of "today", "yesterday", or "tomorrow.</li>
 								<li><code>to</code> - The end date of the events to display. Default is one year after "from" date. Can be either in YYYY-MM-DD format, or one of "today", "yesterday", or "tomorrow.</li>
 								<li><code>for</code> - The duration of events to display, starting after "from" date (inclusive). Default is "1 year". Can use number of days, weeks, months, or years. This argument is ignored if the "to" argument is specified.</li>
+								<li><code>order</code> - The order in which to display the events. Can be "forward" or "backward" in time. Default is "forward." This is most helpful when displaying past events (see example below). </li>
 							</ul>';
 		$txt['html'] .= '<p>Examples:</p>
 							<ul>
@@ -46,7 +47,7 @@ class Events extends GroupMacro
 								<li><code>[[Group.Events(from=today)]]</code> - Another way to display all events from today to 1 year from today</li>
 								<li><code>[[Group.Events(from=today, for=3 months)]]</code> - Displays 3 months of events from today</li>
 								<li><code>[[Group.Events(from=today, to=today)]]</code> - Displays events for today only</li>
-								<li><code>[[Group.Events(from=0000-01-01, to=yesterday)]]</code> - Displays events up to and including yesterday (i.e. all past events)</li>
+								<li><code>[[Group.Events(from=0000-01-01, to=yesterday, order=backward)]]</code> - Displays events up to and including yesterday (i.e. all past events), with most recent events shown first.</li>
 								<li><code>[[Group.Events(from=2021-04-15)]]</code> - Displays events from 2021-04-15 to 2022-04-14 (1 year default)</li>
 								<li><code>[[Group.Events(from=2021-04-15, to=2025-01-01)]]</code> - Displays events from 2021-04-15 to 2025-01-01</li>
 							</ul>';
@@ -85,6 +86,9 @@ class Events extends GroupMacro
 				return "<p style='color:red;'>Error in Group.Events macro: Invalid 'for' argument. Please use a number, whitespace, and then 'days', 'weeks', 'months', or 'years'.</p>";
 			}
 			$filters['to'] = Date::of($filters['from'])->add($filters['for'])->format('Y-m-d 23:59:59');
+		}
+		if (($filters['order'] = $this->_getOrder($args)) === false) {
+			return "<p style='color:red;'>Error in Group.Events macro: Invalid 'order' argument. Please use either 'forward' or 'backward'.</p>";
 		}
 
 		// From date should be before to date
@@ -125,6 +129,7 @@ class Events extends GroupMacro
 		// get request params ($from and $to should already exist)
 		$start = $filters['from'];
 		$end = $filters['to'];
+		$order = (in_array($filters['order'], array('forward', 'forwards')) ? 1 : -1);
 		$calendarId = isset($filters['calendar_id']) ? $filters['calendar_id'] : 0;
 
 		// get calendar events
@@ -228,8 +233,8 @@ class Events extends GroupMacro
 		}
 
 		// Put in order of start datetime
-		uasort($events, function($a, $b) {
-			return $a->up->toUnix() - $b->up->toUnix();
+		uasort($events, function($a, $b) use ($order) {
+			return $order*($a->up->toUnix() - $b->up->toUnix());
 		});
 
 		return $events;
@@ -395,7 +400,7 @@ class Events extends GroupMacro
 				$to = (isset($matches[1])) ? $matches[1] : '';
 				unset($args[$k]);
 
-				// Validation - Check if from is a number, space, then word, or the word "today"
+				// Validation - Check if to is a number, space, then word, or the word "today"
 				if (!(preg_match('/([\d]{4}[-\/][\d]{2}[-\/][\d]{2})/', $to, $matches) && (strtotime($matches[1]) !== false)) &&
 				    !in_array($to, array("today", "yesterday", "tomorrow"))) {
 					$to = false; // Invalid
@@ -410,5 +415,33 @@ class Events extends GroupMacro
 				return $to;
 			}
 		}
+	}
+
+	/**
+	 * Get order argument
+	 *
+	 * @param   array  $args  Macro Arguments
+	 * @return  mixed
+	 */
+	private function _getOrder(&$args)
+	{
+		foreach ($args as $k => $arg)
+		{
+			// Match any word characters, digits, or spaces
+			if (preg_match('/order[\s]*=[\s]*([a-z]*)/', $arg, $matches))
+			{
+				$order = (isset($matches[1])) ? $matches[1] : '';
+				unset($args[$k]);
+
+				// Validation - Check if order is either "forward" or "backward"
+				if (!in_array($order, array("forward", "forwards", "backward", "backwards"))) {
+					$order = false; // Invalid
+				}
+
+				return $order;
+			}
+		}
+
+		return "forward";
 	}
 }
