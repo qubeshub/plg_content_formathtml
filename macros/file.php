@@ -562,7 +562,7 @@ class File extends Macro
 				\Document::addScript(\Request::scheme() . '://www.wolfram.com/cdf-player/plugin/v2.1/cdfplugin.js');
 				\Document::addScript(\Request::root() . 'core/plugins/content/formathtml/macros/macro-assets/file/file.js?t=' . filemtime(__DIR__ . '/macro-assets/file/file.js'));
 
-				$html .= '<noscript>';
+				$html = '<noscript>';
 				$html .= '<div class="embedded-plugin" data-width="' . intval($attr['width']) . '" data-height="' . intval($attr['height']) . '" data-href="' . $attr['href'] . '" style="width: ' . intval($attr['width']) . 'px; height: ' . intval($attr['height']) . ';">';
 				$html .= $attr['alt'];
 				$html .= '</div>';
