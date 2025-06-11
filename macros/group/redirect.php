@@ -62,7 +62,8 @@ class Redirect extends GroupMacro
 
 		// Clean up the args
 		$args = array_map('trim', $args);
-		@list($url, $delay) = $args;
+		$url = $args[0];
+		$delay = isset($args[1]) ? $args[1] : 0;
 		$delay = intval($delay);
 
 		// No delay time? Redirect now.
