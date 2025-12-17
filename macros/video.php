@@ -223,11 +223,11 @@ class Video extends Macro
 		{
 			$ext = strtolower(\Filesystem::extension($video_url));
 
-			\Document::addStyleSheet('//releases.flowplayer.org/5.4.2/skin/minimalist.css');
-			\Document::addScript('//releases.flowplayer.org/5.4.2/flowplayer.min.js');
+			// \Document::addStyleSheet('//releases.flowplayer.org/5.4.2/skin/minimalist.css');
+			// \Document::addScript('//releases.flowplayer.org/5.4.2/flowplayer.min.js');
 
-			$html  = '<div class="flowplayer" data-width="' . $width . '" data-height="' . $height . '">';
-			$html .= '<video id="movie' . rand(0, 1000) . '" width="' . $width . '" height="' . $height . '" preload controls>';
+			// $html  = '<div class="flowplayer" data-width="' . $width . '" data-height="' . $height . '">';
+			$html = '<video id="movie' . rand(0, 1000) . '" width="' . $width . '" height="' . $height . '" preload controls>';
 			switch ($ext)
 			{
 				case 'mov':
@@ -246,7 +246,7 @@ class Video extends Macro
 				break;
 			}
 			$html .= '</video>';
-			$html .= '</div>';
+			// $html .= '</div>';
 		}
 		// External
 		else
