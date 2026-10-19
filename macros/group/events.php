@@ -12,6 +12,7 @@ require_once PATH_APP . DS . 'components' . DS . 'com_events' . DS . 'models' . 
 
 use Plugins\Content\Formathtml\Macros\GroupMacro;
 use Components\Events\Models\Calendar;
+use Date;
 
 /**
  * Group events Macro
@@ -133,14 +134,14 @@ class Events extends GroupMacro
 		$calendarId = isset($filters['calendar_id']) ? $filters['calendar_id'] : 0;
 
 		// get calendar events
-		$eventsCalendar = \Components\Events\Models\Calendar::getInstance();
+		$eventsCalendar = Calendar::getInstance();
 		$rawEvents = $eventsCalendar->events('list', array(
 			'scope'        => 'group',
 			'scope_id'     => $this->group->get('gidNumber'),
 			'calendar_id'  => $calendarId,
 			'state'        => array(1),
-			'publish_up'   => $start, // $start->format('Y-m-d H:i:s'),
-			'publish_down' => $end, // $end->format('Y-m-d H:i:s'),
+			'publish_up'   => $start,
+			'publish_down' => $end,
 			'non_repeating'    => true
 		));
 
@@ -150,9 +151,9 @@ class Events extends GroupMacro
 			'scope_id'     => $this->group->get('gidNumber'),
 			'calendar_id'  => $calendarId,
 			'state'        => array(1),
-			'publish_up'   => $start, // $start->format('Y-m-d H:i:s'),
-			'publish_down' => $end, // $end->format('Y-m-d H:i:s')
-			'until'		   => $end // $end->format('Y-m-d H:i:s')
+			'publish_up'   => $start,
+			'publish_down' => $end,
+			'until'		   => $end
 		));
 
 		// merge events with repeating events
